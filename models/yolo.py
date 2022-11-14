@@ -58,7 +58,8 @@ class Detect(nn.Module):
         for i in range(self.nl):
             x[i] = self.m[i](x[i])  # conv
             bs, _, ny, nx = x[i].shape  # x(bs,255,20,20) to x(bs,3,20,20,85)
-            x[i] = x[i].view(bs, self.na, self.no, ny, nx).permute(0, 1, 3, 4, 2).contiguous()
+            # x[i] = x[i].view(bs, self.na, self.no, ny, nx).permute(0, 1, 3, 4, 2).contiguous() # original
+            x[i] = x[i].view(self.na, self.no, ny, nx).permute(0, 2, 3, 1).contiguous()  # modified
 
             if not self.training:  # inference
                 if self.dynamic or self.grid[i].shape[2:4] != x[i].shape[2:4]:
@@ -85,7 +86,11 @@ class Detect(nn.Module):
         y, x = torch.arange(ny, device=d, dtype=t), torch.arange(nx, device=d, dtype=t)
         yv, xv = torch.meshgrid(y, x, indexing='ij') if torch_1_10 else torch.meshgrid(y, x)  # torch>=0.7 compatibility
         grid = torch.stack((xv, yv), 2).expand(shape) - 0.5  # add grid offset, i.e. y = 2.0 * x - 0.5
-        anchor_grid = (self.anchors[i] * self.stride[i]).view((1, self.na, 1, 1, 2)).expand(shape)
+        # grid = torch.stack((xv, yv), 2).expand((1, self.na, ny, nx, 2)).float()  #original
+        grid = torch.stack((xv, yv), 2).expand((self.na, ny, nx, 2)).float()  #modified
+        # anchor_grid = (self.anchors[i] * self.stride[i]).view((1, self.na, 1, 1, 2)).expand(shape)
+        # anchor_grid = (self.anchors[i].clone() * self.stride[i]).view((1, self.na, 1, 1, 2)).expand((1, self.na, ny, nx, 2)).float()    #original 
+        anchor_grid = (self.anchors[i].clone() * self.stride[i]).view((self.na, 1, 1, 2)).expand((self.na, ny, nx, 2)).float()  #modified
         return grid, anchor_grid
 
 
